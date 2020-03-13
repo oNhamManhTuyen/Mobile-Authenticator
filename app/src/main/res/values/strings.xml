@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Mobile Authenticator</string>
+    <string name="you_need_to_allow_access_to_both_the_permissions">You need to allow access to both the permissions</string>
+    <string name="permission_denied_cannot_access_and_camera">Permission Denied, You cannot access and camera</string>
+    <string name="permission_granted_can_access_camera">Permission Granted, Now you can access camera</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
 </resources>
