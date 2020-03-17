@@ -3,27 +3,19 @@ package com.tuyennm.mobileauthenticator;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.math.BigInteger;
 import java.security.GeneralSecurityException;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.TimeZone;
+import java.util.Arrays;
+import java.util.List;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 public class TOTP {
 
-    private static final int[] DIGITS_POWER
-            // 0 1  2   3    4     5      6       7        8
-            = {1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000};
-
-    private static byte[] hmac_sha(String crypto, byte[] keyBytes,
-                                   byte[] text) {
+    private static byte[] hmac_sha(String crypto, byte[] keyBytes, byte[] text) {
         try {
             Mac hmac;
             hmac = Mac.getInstance(crypto);
-            SecretKeySpec macKey =
-                    new SecretKeySpec(keyBytes, "RAW");
+            SecretKeySpec macKey = new SecretKeySpec(keyBytes, "RAW");
             hmac.init(macKey);
             return hmac.doFinal(text);
         } catch (GeneralSecurityException gse) {
@@ -31,7 +23,7 @@ public class TOTP {
         }
     }
 
-    private static byte[] hexStr2Bytes(String hex) {
+    static byte[] hexStr2Bytes(String hex) {
         // Adding one byte to get the right conversion
         // Values starting with "0" can be converted
         byte[] bArray = new BigInteger("10" + hex, 16).toByteArray();
@@ -43,23 +35,27 @@ public class TOTP {
         return ret;
     }
 
+    private static final int[] DIGITS_POWER
+            // 0 1 2 3 4 5 6 7 8
+            = {1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000};
 
-    public static String generateTOTP(String key,
-                                      String time,
-                                      String returnDigits) {
+    public static String generateTOTP(String key, String time, String returnDigits) {
         return generateTOTP(key, time, returnDigits, "HmacSHA1");
     }
 
-    public static String generateTOTP256(String key,
-                                         String time,
-                                         String returnDigits) {
+    public static String generateTOTP256(String key, String time, String returnDigits) {
         return generateTOTP(key, time, returnDigits, "HmacSHA256");
     }
 
-    public static String generateTOTP(String key,
-                                      String time,
-                                      String returnDigits,
-                                      String crypto) {
+    public static String generateTOTP512(String key, String time, String returnDigits) {
+        return generateTOTP(key, time, returnDigits, "HmacSHA512");
+    }
+
+    public static String generateTOTP(String key, String time, String returnDigits, String crypto) {
+        return generateTOTP(hexStr2Bytes(key), time, returnDigits, crypto);
+    }
+
+    public static String generateTOTP(byte[] key, String time, String returnDigits, String crypto) {
         int codeDigits = Integer.decode(returnDigits).intValue();
         String result = null;
 
@@ -71,17 +67,13 @@ public class TOTP {
 
         // Get the HEX in a Byte[]
         byte[] msg = hexStr2Bytes(time);
-        byte[] k = hexStr2Bytes(key);
-        byte[] hash = hmac_sha(crypto, k, msg);
+        byte[] hash = hmac_sha(crypto, key, msg);
 
         // put selected bytes into result int
         int offset = hash[hash.length - 1] & 0xf;
 
-        int binary =
-                ((hash[offset] & 0x7f) << 24) |
-                        ((hash[offset + 1] & 0xff) << 16) |
-                        ((hash[offset + 2] & 0xff) << 8) |
-                        (hash[offset + 3] & 0xff);
+        int binary = ((hash[offset] & 0x7f) << 24) | ((hash[offset + 1] & 0xff) << 16)
+                | ((hash[offset + 2] & 0xff) << 8) | (hash[offset + 3] & 0xff);
 
         int otp = binary % DIGITS_POWER[codeDigits];
 
@@ -92,62 +84,32 @@ public class TOTP {
         return result;
     }
 
-    public static void main(String[] args) {
-        // Seed for HMAC-SHA1 - 20 bytes
-        String seed = "3132333435363738393031323334353637383930";
-        // Seed for HMAC-SHA256 - 32 bytes
-        String seed32 = "3132333435363738393031323334353637383930" +
-                "313233343536373839303132";
-        // Seed for HMAC-SHA512 - 64 bytes
-        String seed64 = "3132333435363738393031323334353637383930" +
-                "3132333435363738393031323334353637383930" +
-                "3132333435363738393031323334353637383930" +
-                "31323334";
-        long T0 = 0;
-        long X = 30;
-        long[] testTime = {59L, 1111111109L, 1111111111L,
-                1234567890L, 2000000000L, 20000000000L};
+    public static String generateTOTP(byte[] key, long sec30OffSet) {
+        long nowIn30Sec = System.currentTimeMillis() / 1000 / 30;
+        return generateTOTP(key, Long.toHexString(nowIn30Sec + sec30OffSet), "6", "HmacSHA1");
+    }
 
-        String steps = "0";
-        DateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        df.setTimeZone(TimeZone.getTimeZone("UTC"));
+    public static String generateTOTP(byte[] key) {
+        return generateTOTP(key, 0L);
+    }
 
+    public static String generateTOTP(String base32Key) {
         try {
-            System.out.println(
-                    "+---------------+-----------------------+" +
-                            "------------------+--------+--------+");
-            System.out.println(
-                    "|  Time(sec)    |   Time (UTC format)   " +
-                            "| Value of T(Hex)  |  TOTP  | Mode   |");
-            System.out.println(
-                    "+---------------+-----------------------+" +
-                            "------------------+--------+--------+");
+            return generateTOTP(Base32String.decode(base32Key), 0L);
+        } catch (Base32String.DecodingException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
-            for (int i = 0; i < testTime.length; i++) {
-                long T = (testTime[i] - T0) / X;
-                steps = Long.toHexString(T).toUpperCase();
-                while (steps.length() < 16) steps = "0" + steps;
-                String fmtTime = String.format("%1$-11s", testTime[i]);
-                String utcTime = df.format(new Date(testTime[i] * 1000));
-                System.out.print("|  " + fmtTime + "  |  " + utcTime +
-                        "  | " + steps + " |");
-                System.out.println(generateTOTP(seed, steps, "8",
-                        "HmacSHA1") + "| SHA1   |");
-                System.out.print("|  " + fmtTime + "  |  " + utcTime +
-                        "  | " + steps + " |");
-                System.out.println(generateTOTP(seed32, steps, "8",
-                        "HmacSHA256") + "| SHA256 |");
-                System.out.print("|  " + fmtTime + "  |  " + utcTime +
-                        "  | " + steps + " |");
-                System.out.println(generateTOTP(seed64, steps, "8",
-                        "HmacSHA512") + "| SHA512 |");
+    public static List<String> generateTOTP3(byte[] key) {
+        return Arrays.asList(generateTOTP(key, -1L), generateTOTP(key, 0L), generateTOTP(key, 1L));
+    }
 
-                System.out.println(
-                        "+---------------+-----------------------+" +
-                                "------------------+--------+--------+");
-            }
-        } catch (final Exception e) {
-            System.out.println("Error : " + e);
+    public static List<String> generateTOTP3(String base32Key) {
+        try {
+            return generateTOTP3(Base32String.decode(base32Key));
+        } catch (Base32String.DecodingException e) {
+            throw new RuntimeException(e);
         }
     }
 
