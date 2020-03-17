@@ -1,4 +1,4 @@
-package com.tuyennm.mobileauthenticator;
+package com.tuyennm.mobileauthenticator.utils;
 
 import java.lang.reflect.UndeclaredThrowableException;
 import java.math.BigInteger;
@@ -30,8 +30,7 @@ public class TOTP {
 
         // Copy all the REAL bytes, not the "first"
         byte[] ret = new byte[bArray.length - 1];
-        for (int i = 0; i < ret.length; i++)
-            ret[i] = bArray[i + 1];
+        System.arraycopy(bArray, 1, ret, 0, ret.length);
         return ret;
     }
 
@@ -56,14 +55,15 @@ public class TOTP {
     }
 
     public static String generateTOTP(byte[] key, String time, String returnDigits, String crypto) {
-        int codeDigits = Integer.decode(returnDigits).intValue();
-        String result = null;
+        int codeDigits = Integer.decode(returnDigits);
 
         // Using the counter
         // First 8 bytes are for the movingFactor
         // Compliant with base RFC 4226 (HOTP)
-        while (time.length() < 16)
-            time = "0" + time;
+        StringBuilder timeBuilder = new StringBuilder(time);
+        while (timeBuilder.length() < 16)
+            timeBuilder.insert(0, "0");
+        time = timeBuilder.toString();
 
         // Get the HEX in a Byte[]
         byte[] msg = hexStr2Bytes(time);
@@ -77,11 +77,11 @@ public class TOTP {
 
         int otp = binary % DIGITS_POWER[codeDigits];
 
-        result = Integer.toString(otp);
+        StringBuilder result = new StringBuilder(Integer.toString(otp));
         while (result.length() < codeDigits) {
-            result = "0" + result;
+            result.insert(0, "0");
         }
-        return result;
+        return result.toString();
     }
 
     public static String generateTOTP(byte[] key, long sec30OffSet) {

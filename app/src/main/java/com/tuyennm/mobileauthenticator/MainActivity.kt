@@ -23,6 +23,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        showAddedAccountsFragment()
+
         fab.setOnClickListener {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !checkPermission())
                 requestPermission()
@@ -31,9 +33,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun showAddedAccountsFragment() {
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, AddedAccountFragment())
+            .addToBackStack(AddedAccountFragment.TAG)
+            .commit()
+    }
+
     private fun showCameraToScanQRCode() {
         supportFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container, CameraFragment()).commit()
+            .replace(R.id.fragment_container, CameraFragment())
+            .addToBackStack(CameraFragment.TAG)
+            .commit()
     }
 
     private fun checkPermission(): Boolean {

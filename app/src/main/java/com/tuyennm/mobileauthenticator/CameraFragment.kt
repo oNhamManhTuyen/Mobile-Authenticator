@@ -1,13 +1,12 @@
 package com.tuyennm.mobileauthenticator
 
-import android.app.AlertDialog
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.google.zxing.Result
 import kotlinx.android.synthetic.main.fragment_camera.*
 import me.dm7.barcodescanner.core.CameraUtils
@@ -15,13 +14,13 @@ import me.dm7.barcodescanner.zxing.ZXingScannerView
 import java.io.UnsupportedEncodingException
 import java.net.URI
 import java.net.URLDecoder
-import java.text.DateFormat
-import java.text.SimpleDateFormat
-import java.util.*
-import kotlin.collections.LinkedHashMap
 
 
 class CameraFragment : Fragment(), ZXingScannerView.ResultHandler {
+
+    companion object {
+        const val TAG = "CameraFragment"
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -42,39 +41,16 @@ class CameraFragment : Fragment(), ZXingScannerView.ResultHandler {
     }
 
     override fun handleResult(result: Result) {
-//        otpauth://totp/GitHub:manhtuyen911?secret=eg7jv2pzptq3hjnk&issuer=GitHub
-        val stringResult: String = result.text
-        val resultUri = URI.create(stringResult)
+        val resultUri = URI.create(result.text)
         val querySplited = splitQuery(resultUri)
-        val builder = AlertDialog.Builder(activity)
-        builder.setTitle("Scan Result")
-        builder.setNegativeButton(
-            "Again"
-        ) { _, _ -> scannerView.resumeCameraPreview(this) }
-        builder.setPositiveButton(
-            "Go to"
-        ) { _, _ ->
-            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(stringResult))
-            startActivity(browserIntent)
-        }
-        builder.setMessage(stringResult)
-        val alert = builder.create()
-        alert.show()
 
-        val df: DateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-        df.timeZone = TimeZone.getTimeZone("UTC")
-        val T0 = 0
-        val X = 30
-        var steps = "0"
-        val testTime = Calendar.getInstance().timeInMillis
-        val T: Long = (testTime - T0) / X
-        steps = java.lang.Long.toHexString(T).toUpperCase(Locale.getDefault())
-        while (steps.length < 16) steps = "0$steps"
-        val fmtTime = String.format("%1$-11s", testTime)
-        val utcTime: String = df.format(Date(testTime * 1000))
-        val totp = TOTP.generateTOTP(querySplited?.get("secret"))
+        LocalBroadcastManager.getInstance(requireContext())
+            .sendBroadcast(Intent(Constant.ACTION_RECEIVE_SECRET_KEY).apply {
+                putExtra(Constant.EXTRA_ACCOUNT, resultUri.path.substring(1))
+                putExtra(Constant.EXTRA_SECRET_KEY, querySplited?.get("secret"))
+            })
 
-        print("totp = $totp")
+        activity?.supportFragmentManager?.popBackStack()
     }
 
     override fun onResume() {
